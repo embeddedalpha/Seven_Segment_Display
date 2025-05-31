@@ -107,20 +107,51 @@ volatile   uint8_t mux_idx  = 0;
 
 void Seg7_Update()
 {
-	if(mux_idx)
+//	if(mux_idx)
+//	{
+//		Diselect_DIG1();
+//		Select_DIG2();
+//		SEG_PORT->ODR =  seg_lut[digits[0]];
+//	}
+//	else
+//	{
+//		Diselect_DIG2();
+//		Select_DIG1();
+//		SEG_PORT->ODR =  seg_lut[digits[1]];
+//	}
+//
+//	mux_idx ^= 1;
+
+	if(mux_idx == 0)
 	{
 		Diselect_DIG1();
 		Select_DIG2();
 		SEG_PORT->ODR =  seg_lut[digits[0]];
+		mux_idx = 1;
 	}
-	else
+	else if(mux_idx == 1)
 	{
 		Diselect_DIG2();
 		Select_DIG1();
 		SEG_PORT->ODR =  seg_lut[digits[1]];
+		mux_idx = 2;
+	}
+	else if(mux_idx == 2)
+	{
+		Diselect_DIG2();
+		Select_DIG1();
+		SEG_PORT->ODR =  seg_lut[digits[1]];
+		mux_idx = 3;
+	}
+	else if(mux_idx == 3)
+	{
+		Diselect_DIG2();
+		Select_DIG1();
+		SEG_PORT->ODR =  seg_lut[digits[1]];
+		mux_idx = 0;
 	}
 
-	mux_idx ^= 1;
+//	mux_idx ^= 1;
 
 }
 
@@ -150,7 +181,7 @@ void Seg7_Init(TIM_TypeDef *update_Timer, GPIO_TypeDef *segIOPort, GPIO_TypeDef 
 	Seg7_Timer.Interrupt_Request = Timer_Configurations.Interrupt_Request.Update_Interrupt;
 	Seg7_Timer.ISR_Routines.Update_ISR = Seg7_Update;
 	Seg7_Timer.Prescaler = (uint16_t)(8400)-1;
-	Seg7_Timer.Autoreload_Value = 100-1;
+	Seg7_Timer.Autoreload_Value = 10000-1;
 	Timer_Init(&Seg7_Timer);
 	Timer_Trigger(&Seg7_Timer);
 }
