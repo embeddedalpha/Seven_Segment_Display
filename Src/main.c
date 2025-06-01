@@ -20,7 +20,7 @@
 #include "main.h"
 #include "Timer/Timer.h"
 
-static volatile uint8_t digits[2] = {0,0};   /* current value */
+static volatile uint8_t digits[4] = {0,0,0,0};   /* current value */
 
 
 
@@ -63,6 +63,8 @@ uint8_t F = 5;
 uint8_t G = 6;
 uint8_t DIG1 = 9;
 uint8_t DIG2 = 10;
+uint8_t DIG3 = 11;
+uint8_t DIG4 = 12;
 
 static const uint8_t seg_lut[10] = {
 		/*0*/ 0b00111111,
@@ -98,6 +100,25 @@ void Diselect_DIG2(void)
 	GPIO_Pin_High(DIG_Port, DIG2);
 }
 
+
+void Select_DIG3(void)
+{
+	GPIO_Pin_Low(DIG_Port, DIG3);
+}
+void Diselect_DIG3(void)
+{
+	GPIO_Pin_High(DIG_Port, DIG3);
+}
+
+void Select_DIG4(void)
+{
+	GPIO_Pin_Low(DIG_Port, DIG4);
+}
+void Diselect_DIG4(void)
+{
+	GPIO_Pin_High(DIG_Port, DIG4);
+}
+
 void Seven_Segment_Display(void)
 {
 
@@ -125,29 +146,37 @@ void Seg7_Update()
 	if(mux_idx == 0)
 	{
 		Diselect_DIG1();
-		Select_DIG2();
-		SEG_PORT->ODR =  seg_lut[digits[0]];
+		Diselect_DIG2();
+		Diselect_DIG3();
+		Select_DIG4();
+		SEG_PORT->ODR =  seg_lut[digits[3]];
 		mux_idx = 1;
 	}
 	else if(mux_idx == 1)
 	{
+		Diselect_DIG1();
 		Diselect_DIG2();
-		Select_DIG1();
-		SEG_PORT->ODR =  seg_lut[digits[1]];
+		Diselect_DIG4();
+		Select_DIG3();
+		SEG_PORT->ODR =  seg_lut[digits[2]];
 		mux_idx = 2;
 	}
 	else if(mux_idx == 2)
 	{
-		Diselect_DIG2();
-		Select_DIG1();
+		Diselect_DIG1();
+		Diselect_DIG3();
+		Diselect_DIG4();
+		Select_DIG2();
 		SEG_PORT->ODR =  seg_lut[digits[1]];
 		mux_idx = 3;
 	}
 	else if(mux_idx == 3)
 	{
+		Diselect_DIG4();
+		Diselect_DIG3();
 		Diselect_DIG2();
 		Select_DIG1();
-		SEG_PORT->ODR =  seg_lut[digits[1]];
+		SEG_PORT->ODR =  seg_lut[digits[0]];
 		mux_idx = 0;
 	}
 
@@ -188,8 +217,10 @@ void Seg7_Init(TIM_TypeDef *update_Timer, GPIO_TypeDef *segIOPort, GPIO_TypeDef 
 
 void display_number(uint8_t value)
 {
+	digits[0] = value / 1000;       /* thousands  */
+	digits[1] = value / 100;       /* hundereds  */
 	digits[0] = value / 10;       /* tens  */
-	digits[1] = value % 10;       /* ones  */
+	digits[1] = value % 1;       /* ones  */
 }
 
 int main(void)
@@ -211,10 +242,6 @@ int main(void)
 
 			Delay_milli(1000);
 		}
-
-
-
-
 
 
 	}
