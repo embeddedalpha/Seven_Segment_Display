@@ -25,7 +25,7 @@ static volatile uint8_t digits[4] = {0,0,0,0};   /* current value */
 
 
 Timer_Config Seg7_Timer;
-GPIO_TypeDef *DIG_Port = GPIOD;
+GPIO_TypeDef *DIG_Port = GPIOE;
 GPIO_TypeDef *SEG_PORT = GPIOA;
 
 /*
@@ -61,10 +61,12 @@ uint8_t D = 3;
 uint8_t E = 4;
 uint8_t F = 5;
 uint8_t G = 6;
-uint8_t DIG1 = 9;
-uint8_t DIG2 = 10;
-uint8_t DIG3 = 11;
-uint8_t DIG4 = 12;
+uint8_t DIG1 = 0;
+uint8_t DIG2 = 1;
+uint8_t DIG3 = 2;
+uint8_t DIG4 = 3;
+
+static volatile uint16_t number = 0;
 
 static const uint8_t seg_lut[10] = {
 		/*0*/ 0b00111111,
@@ -85,14 +87,14 @@ void Select_DIG1(void)
 	GPIO_Pin_Low(DIG_Port, DIG1);
 }
 
-void Select_DIG2(void)
-{
-	GPIO_Pin_Low(DIG_Port, DIG2);
-}
-
 void Diselect_DIG1(void)
 {
 	GPIO_Pin_High(DIG_Port, DIG1);
+}
+
+void Select_DIG2(void)
+{
+	GPIO_Pin_Low(DIG_Port, DIG2);
 }
 
 void Diselect_DIG2(void)
@@ -145,38 +147,51 @@ void Seg7_Update()
 
 	if(mux_idx == 0)
 	{
-		Diselect_DIG1();
 		Diselect_DIG2();
 		Diselect_DIG3();
-		Select_DIG4();
+		Diselect_DIG4();
+		Select_DIG1();
 		SEG_PORT->ODR =  seg_lut[digits[3]];
 		mux_idx = 1;
 	}
 	else if(mux_idx == 1)
 	{
-		Diselect_DIG1();
-		Diselect_DIG2();
-		Diselect_DIG4();
-		Select_DIG3();
-		SEG_PORT->ODR =  seg_lut[digits[2]];
+		if(number > 9)
+		{
+			Diselect_DIG1();
+			Diselect_DIG3();
+			Diselect_DIG4();
+			Select_DIG2();
+			SEG_PORT->ODR =  seg_lut[digits[2]];
+		}
+
 		mux_idx = 2;
 	}
 	else if(mux_idx == 2)
 	{
-		Diselect_DIG1();
-		Diselect_DIG3();
-		Diselect_DIG4();
-		Select_DIG2();
-		SEG_PORT->ODR =  seg_lut[digits[1]];
+		if(number > 99)
+		{
+			Diselect_DIG1();
+			Diselect_DIG2();
+			Diselect_DIG4();
+			Select_DIG3();
+			SEG_PORT->ODR =  seg_lut[digits[1]];
+		}
+
+
 		mux_idx = 3;
 	}
 	else if(mux_idx == 3)
 	{
-		Diselect_DIG4();
-		Diselect_DIG3();
-		Diselect_DIG2();
-		Select_DIG1();
-		SEG_PORT->ODR =  seg_lut[digits[0]];
+		if(number > 999)
+		{
+			Diselect_DIG1();
+			Diselect_DIG2();
+			Diselect_DIG3();
+			Select_DIG4();
+			SEG_PORT->ODR =  seg_lut[digits[0]];
+		}
+
 		mux_idx = 0;
 	}
 
@@ -196,6 +211,8 @@ void Seg7_Init(TIM_TypeDef *update_Timer, GPIO_TypeDef *segIOPort, GPIO_TypeDef 
 	GPIO_Pin_Init(segIOPort, G, GPIO_Configuration.Mode.General_Purpose_Output, GPIO_Configuration.Output_Type.Push_Pull, GPIO_Configuration.Speed.Very_High_Speed, GPIO_Configuration.Pull.Pull_Up, GPIO_Configuration.Alternate_Functions.None);
 	GPIO_Pin_Init(digPort, DIG1, GPIO_Configuration.Mode.General_Purpose_Output, GPIO_Configuration.Output_Type.Open_Drain, GPIO_Configuration.Speed.Very_High_Speed, GPIO_Configuration.Pull.None, GPIO_Configuration.Alternate_Functions.None);
 	GPIO_Pin_Init(digPort, DIG2, GPIO_Configuration.Mode.General_Purpose_Output, GPIO_Configuration.Output_Type.Open_Drain, GPIO_Configuration.Speed.Very_High_Speed, GPIO_Configuration.Pull.None, GPIO_Configuration.Alternate_Functions.None);
+	GPIO_Pin_Init(digPort, DIG3, GPIO_Configuration.Mode.General_Purpose_Output, GPIO_Configuration.Output_Type.Open_Drain, GPIO_Configuration.Speed.Very_High_Speed, GPIO_Configuration.Pull.None, GPIO_Configuration.Alternate_Functions.None);
+	GPIO_Pin_Init(digPort, DIG4, GPIO_Configuration.Mode.General_Purpose_Output, GPIO_Configuration.Output_Type.Open_Drain, GPIO_Configuration.Speed.Very_High_Speed, GPIO_Configuration.Pull.None, GPIO_Configuration.Alternate_Functions.None);
 
 
 //	GPIO_Pin_Init(digPort, DIG1, GPIO_Configuration.Mode.General_Purpose_Output, GPIO_Configuration.Output_Type.Push_Pull, GPIO_Configuration.Speed.Very_High_Speed, GPIO_Configuration.Pull.Pull_Up, GPIO_Configuration.Alternate_Functions.None);
@@ -210,17 +227,27 @@ void Seg7_Init(TIM_TypeDef *update_Timer, GPIO_TypeDef *segIOPort, GPIO_TypeDef 
 	Seg7_Timer.Interrupt_Request = Timer_Configurations.Interrupt_Request.Update_Interrupt;
 	Seg7_Timer.ISR_Routines.Update_ISR = Seg7_Update;
 	Seg7_Timer.Prescaler = (uint16_t)(8400)-1;
-	Seg7_Timer.Autoreload_Value = 10000-1;
+	Seg7_Timer.Autoreload_Value = 10-1;
 	Timer_Init(&Seg7_Timer);
 	Timer_Trigger(&Seg7_Timer);
 }
 
-void display_number(uint8_t value)
+void display_number(uint16_t value)
 {
-	digits[0] = value / 1000;       /* thousands  */
-	digits[1] = value / 100;       /* hundereds  */
-	digits[0] = value / 10;       /* tens  */
-	digits[1] = value % 1;       /* ones  */
+//	// value = 1234
+//	digits[0] = value / 1000;       /* thousands = 1 */
+//	digits[1] = (value / 100)%10;       /* hundereds = (12)%10 = 2 */
+//	digits[2] = (value % 100)/10;       /* tens  */
+//	digits[3] = value % 10;       /* ones  */
+
+
+
+	for(int i=3;i>=0;i--)
+	{
+		digits[i]=value%10;
+		value=value/10;
+	}
+
 }
 
 int main(void)
@@ -235,13 +262,33 @@ int main(void)
 	{
 
 
-		for(int n = 0; n < 100; n++)
+		for(int n = 0; n <= 9999; n++)
 		{
 
+			number = n;
 			display_number(n);
 
-			Delay_milli(1000);
+			Delay_milli(250);
 		}
+
+//		number = 5;
+//		display_number(number);
+//		Delay_s(2);
+//
+//
+//		number = 50;
+//		display_number(number);
+//		Delay_s(2);
+//
+//
+//		number = 500;
+//		display_number(number);
+//		Delay_s(2);
+//
+//
+//		number = 5000;
+//		display_number(number);
+//		Delay_s(2);
 
 
 	}
